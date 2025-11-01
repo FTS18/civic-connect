@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicConnect: Real-Time Issue Reporter</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Leaflet CSS for Mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        /* Custom Styles for CivicConnect Aesthetic */
+        :root {
+            --color-primary: #3b82f6; /* Blue-500: Vibrant Primary */
+            --color-resolved: #10B981; /* Emerald-500 */
+            --color-reported: #F59E0B; /* Amber-500 */
+            --color-inprogress: #EF4444; /* Red-500 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #eef2ff; /* Lighter, subtle purple background (Indigo-50) for freshness */
+        }
+        
+        /* Custom Scrollbar for better aesthetic */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e0e7ff; /* Indigo-100 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-primary); /* Use primary color */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2563eb; /* Blue-600 */
+        }
+        
+        /* Enhanced Header Styling */
+        .main-header {
+            border-bottom: 3px solid #BFDBFE; /* Blue-200 for a clean separator line */
+        }
+
+        #map {
+            height: 450px; /* Slightly taller map */
+            width: 100%;
+            border-radius: 1rem; 
+            box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.15); /* Stronger, defined shadow */
+            z-index: 10;
+        }
+        .leaflet-container {
+            font-family: 'Inter', sans-serif;
+        }
+        .issue-card {
+            border-left-width: 5px; /* Thicker accent border */
+            /* Enhanced Aesthetics: Add smooth transition for lift/scale */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            cursor: pointer;
+        }
+        /* Apply subtle lift and enhanced shadow on hover */
+        .issue-card:hover {
+            transform: translateY(-6px); /* Lift the card slightly more */
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); /* Stronger shadow for depth */
+        }
+        .reported-border { border-left-color: var(--color-reported); }
+        .in-progress-border { border-left-color: var(--color-inprogress); }
+        .resolved-border { border-left-color: var(--color-resolved); }
+
+        /* Modal specific styling */
+        #report-modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-content {
+             /* Stronger shadow and a subtle ring effect */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+            border: 1px solid #E0E7FF;
+        }
+        /* Animation for error */
+        .shake {
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% {transform: translateX(0);}
+            20%, 60% {transform: translateX(-5px);}
+            40%, 80% {transform: translateX(5px);}
+        }
+        
+        /* Pulsing animation for user location marker */
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen antialiased">
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-blue-900 bg-opacity-80 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-xl w-full max-w-md shadow-2xl">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Login to CivicConnect</h2>
+            <div id="auth-error" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded-lg"></div>
+            
+            <!-- Auth Forms -->
+            <form id="email-auth-form" class="space-y-4 mb-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="email" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                </div>
+                <div class="flex space-x-4">
+                    <button type="button" onclick="handleEmailLogin()" class="flex-1 bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700">Login</button>
+                    <button type="button" onclick="handleEmailSignup()" class="flex-1 bg-green-600 text-white rounded-lg py-2 hover:bg-green-700">Sign Up</button>
+                </div>
+            </form>
+            
+            <!-- Google Sign In -->
+            <div class="relative">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-300"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+            </div>
+            
+            <button onclick="handleGoogleSignIn()" class="mt-6 w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-5 h-5 mr-2" alt="Google logo">
+                Sign in with Google
+            </button>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <!-- Status & Admin Control Panel -->
+        <div class="bg-white p-5 rounded-xl shadow-2xl mb-8 flex flex-col md:flex-row justify-between items-center ring-2 ring-indigo-200/50">
+            <div class="flex space-x-6 text-sm font-bold mb-4 md:mb-0 text-gray-700">
+                <span class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color: var(--color-reported);"></span>Reported</span>
+                <span class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color: var(--color-inprogress);"></span>In Progress</span>
+                <span class="flex items-center"><span class="w-3 h-3 rounded-full mr-2" style="background-color: var(--color-resolved);"></span>Resolved</span>
+            </div>
+            
+            <!-- Admin Toggle -->
+            <div class="flex items-center">
+                <span class="text-sm font-medium text-gray-700 mr-3">Admin View (Demo)</span>
+                <label for="admin-toggle" class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" value="" id="admin-toggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Connection Status Message (New Element) -->
+        <div id="connection-status-message" class="hidden mb-6 p-4 text-sm font-semibold rounded-xl text-center bg-gray-100 text-gray-700 border border-gray-300">
+            <!-- Status messages will be injected here -->
+        </div>
+
+        <!-- Map Section -->
+        <div id="map" class="mb-10"></div>
+
+        <!-- Issues List Section -->
+        <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b border-blue-200 pb-2">All Reports</h2>
+        <!-- Loading text remains outside the list container -->
+        <p id="loading-text" class="text-gray-500 col-span-full mb-4 font-medium">Loading issues...</p>
+        <div id="issues-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Content will be injected here -->
+        </div>
+    </main>
+
+    <!-- Modal for Reporting Issue - Improved Area -->
+    <div id="report-modal" class="fixed inset-0 bg-blue-900 bg-opacity-80 z-50 hidden items-center justify-center p-4" onclick="closeModal(event)">
+        <div class="modal-content bg-white p-8 rounded-xl w-full max-w-lg shadow-2xl transition duration-300" onclick="event.stopPropagation()">
+            <h3 class="text-2xl font-extrabold text-blue-600 mb-6 border-b pb-2">Report a New Issue</h3>
+            
+            <!-- Location Display (Enhanced) -->
+            <p id="location-display" class="text-base text-gray-800 font-bold mb-5 bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-500">
+                Location Selected: Click on map to select location.
+            </p>
+            
+            <!-- Error Message Area - Now used for both validation and submission errors -->
+            <div id="location-error" class="hidden mb-4 p-3 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-lg font-medium">
+                <!-- Error messages injected here -->
+            </div>
+
+            <form id="report-form" onsubmit="handleReport(event)">
+                <div class="mb-5">
+                    <label for="category" class="block text-sm font-medium text-gray-700 mb-1">Issue Category</label>
+                    <select id="category" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border text-gray-700">
+                        <option value="">Select a category</option>
+                        <option value="Pothole">Pothole/Road Damage</option>
+                        <option value="Garbage">Trash/Illegal Dumping</option>
+                        <option value="Lighting">Street Light Outage</option>
+                        <option value="Water">Water Leak/Pipe Burst</option>
+                        <option value="Graffiti">Graffiti/Vandalism</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="mb-6">
+                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Detailed Description</label>
+                    <textarea id="description" rows="4" required placeholder="Describe the issue clearly..." class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border text-gray-700"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="window.hideModal()" class="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150 shadow-sm">Cancel</button>
+                    <button type="submit" id="submit-btn" class="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition duration-150 shadow-lg shadow-blue-400/50">
+                        Submit Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Load Leaflet JavaScript (This must remain a regular script before the module) -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Load Firebase Modules AND Client Logic (ALL IN ONE BLOCK) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword,
+            createUserWithEmailAndPassword,
+            signInWithPopup,
+            GoogleAuthProvider,
+            onAuthStateChanged,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, addDoc, updateDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- ⬇️ 1. FIREBASE CONFIG ⬇️ ---
+        const USER_PROVIDED_FIREBASE_CONFIG = {
+            apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+            authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+            storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+            appId: import.meta.env.VITE_FIREBASE_APP_ID,
+            measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+        };
+        // --- ⬆️ FIREBASE CONFIG ⬆️ ---
+
+
+        // IMPORTANT: Global variables are automatically provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // Check if config is provided and parse it
+        const envConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : null;
+        const envToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Use environment config first, fall back to user-provided config
+        const firebaseConfig = envConfig || USER_PROVIDED_FIREBASE_CONFIG;
+        const initialAuthToken = envToken; // Use envToken if available, otherwise null
+
+        // Global variables for Firebase instances
+        window.db = null;
+        window.auth = null;
+        window.currentUserId = null;
+        window.isDatabaseReady = false; // New readiness state
+        window.issuesCollectionPath = `artifacts/${appId}/public/data/civic_issues`;
+        window.mapInstance = null;
+        window.markers = {}; 
+        window.selectedLocation = null;
+        window.isAdmin = false;
+
+        setLogLevel('Debug'); // Enable detailed logging
+
+        window.setupFirebase = async function() {
+            const reportBtn = document.getElementById('report-btn');
+            const connectionStatus = document.getElementById('connection-status-message');
+            const issuesList = document.getElementById('issues-list');
+            const loadingText = document.getElementById('loading-text');
+
+            // This check now fails only if BOTH env and user config are missing
+            if (!firebaseConfig) { 
+                console.error("Firebase config not available. Running in Demonstration Mode.");
+                
+                window.isDatabaseReady = false;
+                
+                // UI Updates for Demo Mode
+                reportBtn.textContent = 'Demo Mode (Read-Only)';
+                reportBtn.disabled = true;
+                
+                document.getElementById('user-id-display').textContent = 'DEMO';
+
+                connectionStatus.textContent = '⚠️ Demonstration Mode: Reporting is disabled. (Paste your Firebase config in the script to enable).';
+                connectionStatus.classList.remove('hidden', 'bg-blue-100', 'text-blue-700', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+                connectionStatus.classList.add('bg-yellow-100', 'text-yellow-700'); 
+                connectionStatus.classList.remove('hidden');
+
+                // Initialize map even without Firebase
+                initMap();
+                
+                // Manually hide loading text and show empty list message
+                if(loadingText) loadingText.classList.add('hidden');
+                issuesList.innerHTML = '<p class="text-gray-500 col-span-full font-medium p-4 bg-gray-50 rounded-lg">Database connection unavailable. Issues cannot be loaded or reported in this mode.</p>';
+
+                return; 
+            }
+            
+            // Set initial connection attempt status
+            connectionStatus.textContent = 'Connecting to database...';
+            connectionStatus.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-yellow-100', 'text-yellow-700');
+            connectionStatus.classList.add('bg-blue-100', 'text-blue-700');
+
+
+            try {
+                // 1. Initialize Firebase
+                const app = initializeApp(firebaseConfig);
+                window.db = getFirestore(app);
+                window.auth = getAuth(app);
+                window.googleProvider = new GoogleAuthProvider();
+
+                // Initialize UI elements
+                const userControls = document.getElementById('user-controls');
+                const loginBtn = document.getElementById('login-btn');
+                const authModal = document.getElementById('auth-modal');
+                
+                // Auth Modal Functions
+                window.showAuthModal = () => {
+                    authModal.style.display = 'flex';
+                };
+                
+                window.hideAuthModal = () => {
+                    authModal.style.display = 'none';
+                    document.getElementById('auth-error').classList.add('hidden');
+                };
+                
+                // Authentication Functions
+                window.handleEmailLogin = async () => {
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    try {
+                        await signInWithEmailAndPassword(window.auth, email, password);
+                        hideAuthModal();
+                    } catch (error) {
+                        showAuthError(error.message);
+                    }
+                };
+                
+                window.handleEmailSignup = async () => {
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    try {
+                        await createUserWithEmailAndPassword(window.auth, email, password);
+                        hideAuthModal();
+                    } catch (error) {
+                        showAuthError(error.message);
+                    }
+                };
+                
+                window.handleGoogleSignIn = async () => {
+                    try {
+                        await signInWithPopup(window.auth, window.googleProvider);
+                        hideAuthModal();
+                    } catch (error) {
+                        showAuthError(error.message);
+                    }
+                };
+                
+                window.handleSignOut = async () => {
+                    try {
+                        await signOut(window.auth);
+                    } catch (error) {
+                        console.error('Error signing out:', error);
+                    }
+                };
+                
+                window.showAuthError = (message) => {
+                    const errorDiv = document.getElementById('auth-error');
+                    errorDiv.textContent = message;
+                    errorDiv.classList.remove('hidden');
+                };
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                connectionStatus.textContent = '❌ Connection Error: Failed to initialize Firebase components. Check your config object.';
+                connectionStatus.classList.remove('bg-blue-100', 'text-blue-700');
+                connectionStatus.classList.add('bg-red-100', 'text-red-700');
+            }
+            
+            // Auth State Listener
+            onAuthStateChanged(window.auth, (user) => {
+                const userControls = document.getElementById('user-controls');
+                const loginBtn = document.getElementById('login-btn');
+                const userDisplay = document.getElementById('user-id-display');
+                const reportBtn = document.getElementById('report-btn');
+
+                if (user) {
+                    // User is signed in
+                    userControls.classList.remove('hidden');
+                    loginBtn.classList.add('hidden');
+                    userDisplay.textContent = user.email || user.uid;
+                    reportBtn.disabled = false;
+                    reportBtn.textContent = 'Report Issue';
+                    hideAuthModal();
+                } else {
+                    // User is signed out
+                    userControls.classList.add('hidden');
+                    loginBtn.classList.remove('hidden');
+                    userDisplay.textContent = 'Not logged in';
+                    reportBtn.disabled = true;
+                }
+                if (user) {
+                    // Success Path
+                    window.currentUserId = user.uid;
+                    document.getElementById('user-id-display').textContent = window.currentUserId.substring(0, 8) + '...';
+                    window.isDatabaseReady = true; // Set readiness flag
+                    
+                    reportBtn.textContent = '+ Report Issue';
+                    reportBtn.disabled = false;
+                    
+                    // Update and hide status message on successful connection
+                    connectionStatus.textContent = '✅ Database Connected. You can now report issues.';
+                    connectionStatus.classList.remove('bg-blue-100', 'text-blue-700');
+                    connectionStatus.classList.add('bg-green-100', 'text-green-700');
+                    setTimeout(() => connectionStatus.classList.add('hidden'), 2000); // Hide after 2 seconds
+
+                    window.loadIssues();
+                } else {
+                    // Fallback (e.g., anonymous sign-in failed)
+                    window.currentUserId = crypto.randomUUID(); 
+                    window.isDatabaseReady = false;
+                    reportBtn.textContent = 'Connection Error';
+                    reportBtn.disabled = true;
+                    connectionStatus.textContent = '❌ Connection Error: Failed to authenticate user. Check auth rules in your Firebase project.';
+                    connectionStatus.classList.remove('hidden', 'bg-blue-100', 'text-blue-700');
+                    connectionStatus.classList.add('bg-red-100', 'text-red-700');
+                }
+                // Map should be initialized regardless of Firebase status for a good UX
+                if (!window.mapInstance) initMap(); 
+            });
+        };
+
+        window.handleReport = async function(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const locationErrorDiv = document.getElementById('location-error');
+            
+            // Reset error state and button state before processing
+            locationErrorDiv.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            // CRITICAL CHECK for database readiness
+            if (!window.isDatabaseReady || !window.db) {
+                console.error("Report submission blocked: Database not ready or failed to initialize.");
+                locationErrorDiv.textContent = '❌ Cannot submit: The database connection is not active (Demo Mode).';
+                locationErrorDiv.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Report';
+                return;
+            }
+            
+            // CRITICAL VALIDATION CHECK for map click
+            if (!window.selectedLocation) {
+                console.warn("Report submission blocked: Location not selected on map.");
+                locationErrorDiv.textContent = '🛑 You must click on the map to select the issue\'s exact location before submitting.';
+                locationErrorDiv.classList.remove('hidden');
+                document.getElementById('location-display').classList.add('shake', 'border-red-500');
+                setTimeout(() => {
+                    document.getElementById('location-display').classList.remove('shake', 'border-red-500');
+                }, 500);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Report';
+                return;
+            }
+
+
+            try {
+                const category = document.getElementById('category').value;
+                const description = document.getElementById('description').value;
+                
+                const issueData = {
+                    reporterId: window.currentUserId,
+                    category: category,
+                    description: description,
+                    latitude: window.selectedLocation.lat,
+                    longitude: window.selectedLocation.lng,
+                    status: 'Reported',
+                    timestamp: serverTimestamp(),
+                };
+
+                const colRef = collection(window.db, window.issuesCollectionPath);
+                const docRef = await addDoc(colRef, issueData);
+
+                console.log("Document successfully written with ID: ", docRef.id); 
+
+                // Reset form and clear selected location (IMPORTANT)
+                document.getElementById('report-form').reset();
+                window.selectedLocation = null; 
+                
+                // Show a temporary success message
+                locationErrorDiv.textContent = '✅ Issue successfully reported! Thank you.';
+                locationErrorDiv.classList.remove('hidden');
+                locationErrorDiv.classList.remove('bg-red-100', 'border-red-500', 'text-red-700');
+                locationErrorDiv.classList.add('bg-green-100', 'border-green-500', 'text-green-700');
+                
+                // Hide modal after a short delay
+                setTimeout(() => {
+                    window.hideModal();
+                }, 1500);
+
+            } catch (e) {
+                console.error("CRITICAL DATABASE ERROR: ", e);
+                // Show error to the user
+                locationErrorDiv.textContent = '❌ Submission failed due to a database error. Check your Firestore rules.';
+                locationErrorDiv.classList.remove('hidden');
+            } finally {
+                // Ensure button is re-enabled if modal is not hidden (e.g., on error)
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Report';
+            }
+        };
+
+        window.loadIssues = function() {
+            if (!window.db) { return; }
+
+            const colRef = collection(window.db, window.issuesCollectionPath);
+            // NOTE: Using a simple query without orderBy to avoid index issues.
+            const issuesQuery = query(colRef); 
+            
+            const issuesList = document.getElementById('issues-list');
+            const loadingText = document.getElementById('loading-text');
+
+            // Show loading indicator
+            if(loadingText) loadingText.classList.remove('hidden');
+
+            // Set up real-time listener
+            onSnapshot(issuesQuery, (snapshot) => {
+                // Clear existing markers and list
+                issuesList.innerHTML = '';
+                Object.values(window.markers).forEach(marker => marker.remove());
+                window.markers = {};
+
+                const issueData = [];
+
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    issueData.push({ id: doc.id, ...data });
+                    window.addIssueToMap(doc.id, data);
+                });
+                
+                // Sort by timestamp (newest first) on client side
+                issueData.sort((a, b) => {
+                    if (!a.timestamp) return 1;
+                    if (!b.timestamp) return -1;
+                    // The .toDate() method is necessary for Firestore Timestamps
+                    return (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0);
+                });
+
+                issueData.forEach(issue => window.renderIssueCard(issue));
+
+                if (issueData.length === 0) {
+                    issuesList.innerHTML = '<p class="text-gray-500 col-span-full font-medium">No issues reported yet. Be the first!</p>';
+                }
+                
+                // Hide loading indicator
+                if(loadingText) loadingText.classList.add('hidden');
+            }, (error) => {
+                console.error("Error loading issues: ", error);
+                if(loadingText) loadingText.textContent = 'Error loading issues. Check console.';
+            });
+        };
+
+        window.updateStatus = async function(issueId, newStatus) {
+            if (!window.db || !window.isAdmin) { return; }
+            
+            const docRef = doc(window.db, window.issuesCollectionPath, issueId);
+            try {
+                await updateDoc(docRef, { 
+                    status: newStatus,
+                    lastUpdate: serverTimestamp()
+                });
+                console.log(`Status updated for ${issueId} to ${newStatus}`);
+            } catch (e) {
+                console.error("Error updating status: ", e);
+                console.log("Failed to update status. Check console.");
+            }
+        };
+
+
+        // --- ALL LEAFLET AND UI FUNCTIONS ARE MOVED HERE ---
+
+        function initMap() {
+            if (window.mapInstance) return; // Prevent double initialization
+            
+            // Default center (fallback) is a neutral spot
+            const defaultLat = 30.7333; 
+            const defaultLng = 76.7794; 
+
+            // Initialize map with default location first
+            window.mapInstance = L.map('map').setView([defaultLat, defaultLng], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(window.mapInstance);
+
+            // Add Click Listener to Map for Reporting
+            window.mapInstance.on('click', onMapClick);
+
+            // Try to get user's current location
+            if ("geolocation" in navigator) {
+                // Show loading state
+                const connectionStatus = document.getElementById('connection-status-message');
+                connectionStatus.textContent = '📍 Getting your location...';
+                connectionStatus.classList.remove('hidden', 'bg-red-100', 'text-red-700');
+                connectionStatus.classList.add('bg-blue-100', 'text-blue-700');
+
+                navigator.geolocation.getCurrentPosition(
+                    // Success callback
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+                        
+                        // Pan map to user's location
+                        window.mapInstance.setView([userLat, userLng], 14);
+                        
+                        // Add a special marker for user's location
+                        L.marker([userLat, userLng], {
+                            icon: L.divIcon({
+                                className: 'custom-div-icon',
+                                html: `<div class="pulse" style="background-color: #3b82f6; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 rgba(59, 130, 246, 0.4); animation: pulse 2s infinite;"></div>`,
+                                iconSize: [24, 24],
+                                iconAnchor: [12, 12]
+                            })
+                        }).addTo(window.mapInstance)
+                        .bindPopup("You are here. Click anywhere to report an issue.").openPopup();
+
+                        // Show success message briefly
+                        connectionStatus.textContent = '📍 Location found!';
+                        connectionStatus.classList.remove('bg-blue-100', 'text-blue-700');
+                        connectionStatus.classList.add('bg-green-100', 'text-green-700');
+                        setTimeout(() => connectionStatus.classList.add('hidden'), 2000);
+                    },
+                    // Error callback
+                    (error) => {
+                        console.warn("Geolocation error:", error);
+                        connectionStatus.textContent = '⚠️ Could not get your location. Using default view.';
+                        connectionStatus.classList.remove('bg-blue-100', 'text-blue-700');
+                        connectionStatus.classList.add('bg-yellow-100', 'text-yellow-700');
+                        setTimeout(() => connectionStatus.classList.add('hidden'), 3000);
+                        
+                        // Add default marker since we couldn't get location
+                        L.marker([defaultLat, defaultLng]).addTo(window.mapInstance)
+                            .bindPopup("Click anywhere on the map to report an issue.").openPopup();
+                    },
+                    // Options
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                // Geolocation not supported
+                const connectionStatus = document.getElementById('connection-status-message');
+                connectionStatus.textContent = '⚠️ Location services not available in your browser. Using default view.';
+                connectionStatus.classList.remove('hidden', 'bg-blue-100', 'text-blue-700');
+                connectionStatus.classList.add('bg-yellow-100', 'text-yellow-700');
+                setTimeout(() => connectionStatus.classList.add('hidden'), 3000);
+                
+                // Add default marker since geolocation is not available
+                L.marker([defaultLat, defaultLng]).addTo(window.mapInstance)
+                    .bindPopup("Click anywhere on the map to report an issue.").openPopup();
+            }
+        }
+
+        function onMapClick(e) {
+            if (!window.isDatabaseReady) {
+                 // Prevent opening modal if in read-only mode, but still select location
+                 window.selectedLocation = e.latlng;
+                 updateLocationDisplay();
+                 window.showModal(); // Show modal to explain why submission is blocked
+                 return;
+            }
+            
+            window.selectedLocation = e.latlng;
+            // When a location is selected, update the modal display if it's open
+            if (!document.getElementById('report-modal').classList.contains('hidden')) {
+                updateLocationDisplay();
+            } else {
+                // If modal is closed, open it (original behavior if user clicks map first)
+                window.showModal();
+            }
+        }
+
+        function getMarkerColor(status) {
+            switch (status) {
+                case 'Reported':
+                    return '#F59E0B'; // Amber
+                case 'In Progress':
+                    return '#EF4444'; // Red
+                case 'Resolved':
+                    return '#10B981'; // Emerald
+                default:
+                    return '#9CA3AF'; // Gray
+            }
+        }
+
+        function getMarkerIcon(status) {
+            // L is defined globally by the regular Leaflet script
+            return L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div style="background-color: ${getMarkerColor(status)}; width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+        }
+
+        window.addIssueToMap = function(id, data) {
+            // Remove existing marker if it's an update
+            if (window.markers[id]) {
+                window.markers[id].remove();
+            }
+
+            const icon = getMarkerIcon(data.status);
+            
+            const marker = L.marker([data.latitude, data.longitude], { icon: icon }).addTo(window.mapInstance);
+            
+            const timestampText = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : 'N/A';
+            
+            const popupContent = `
+                <div class="font-sans text-sm">
+                    <h4 class="font-bold text-base mb-1 text-blue-600">${data.category}</h4>
+                    <span class="text-xs font-medium text-white px-2 py-0.5 rounded-full" style="background-color: ${getMarkerColor(data.status)};">${data.status}</span>
+                    <p class="text-gray-700 mt-2">${data.description}</p>
+                    <p class="mt-2 text-xs text-gray-500">Reported: ${timestampText}</p>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            window.markers[id] = marker;
+        }
+
+        // --- FIXED: Attach to window to make it accessible to inline onclick handlers ---
+        window.zoomToIssue = function(id) {
+            console.log("Attempting to zoom to issue ID:", id); // Check if the function is called
+            const marker = window.markers[id];
+            if (marker) {
+                window.mapInstance.setView(marker.getLatLng(), 17); // Zoom level 17
+                marker.openPopup();
+            } else {
+                console.error("Marker not found in window.markers for ID:", id);
+            }
+        }
+
+
+        // --- UI & Modal Functions (Client-Side) ---
+        
+        // Helper function to update the location text
+        function updateLocationDisplay() {
+            const display = document.getElementById('location-display');
+            
+            if (window.selectedLocation) {
+                // Clear any error styling
+                display.classList.remove('border-red-500', 'bg-red-50', 'shake');
+
+                const lat = window.selectedLocation.lat.toFixed(4);
+                const lng = window.selectedLocation.lng.toFixed(4);
+                display.innerHTML = 
+                    `<span class="text-blue-600">Location Selected:</span> Lat <span class="font-mono">${lat}</span>, Lng <span class="font-mono">${lng}</span>`;
+                display.classList.remove('bg-yellow-50', 'border-yellow-500');
+                display.classList.add('bg-green-50', 'border-green-500'); // Positive indication
+            } else {
+                display.innerHTML = 'Location Selected: Click on map to select location.';
+                display.classList.remove('bg-green-50', 'border-green-500');
+                display.classList.add('bg-yellow-50', 'border-yellow-500'); // Default prompt
+            }
+        }
+        
+        // --- Modal functions need to be global, but can call local functions ---
+        window.showModal = function() {
+            document.getElementById('report-modal').classList.remove('hidden');
+            document.getElementById('report-modal').classList.add('flex');
+            
+            // Clear any old error message when showing the modal
+            const locationErrorDiv = document.getElementById('location-error');
+            locationErrorDiv.classList.add('hidden');
+            locationErrorDiv.classList.remove('bg-green-100', 'border-green-500', 'text-green-700');
+            locationErrorDiv.classList.add('bg-red-100', 'border-red-500', 'text-red-700');
+
+            // If not ready, show the submission blocked error immediately
+            if (!window.isDatabaseReady) {
+                locationErrorDiv.textContent = '❌ Cannot submit: Database is in Demonstration (Read-Only) Mode.';
+                locationErrorDiv.classList.remove('hidden');
+            }
+
+            // Update the display to show current location or prompt
+            updateLocationDisplay();
+        }
+
+        window.hideModal = function() {
+            document.getElementById('report-modal').classList.add('hidden');
+            document.getElementById('report-modal').classList.remove('flex');
+            
+            // Also hide any active error messages when closing
+            document.getElementById('location-error').classList.add('hidden');
+        }
+
+        window.closeModal = function(event) {
+            // Hide the modal only if the click is on the backdrop
+            if (event.target === document.getElementById('report-modal')) {
+                window.hideModal();
+            }
+        }
+
+        // --- Event Listeners must be defined AFTER the functions they call ---
+        
+        // Report Button now opens modal directly
+        document.getElementById('report-btn').addEventListener('click', () => {
+             // When opening via the button, assume user wants to select a *new* location
+             // This enforces a fresh selection if the last report was submitted via map click.
+             if (document.getElementById('report-modal').classList.contains('hidden')) {
+                window.selectedLocation = null;
+             }
+            window.showModal();
+        });
+
+        // --- Admin Toggle ---
+        document.getElementById('admin-toggle').addEventListener('change', (e) => {
+            window.isAdmin = e.target.checked;
+            // Re-render the list to show or hide admin controls
+            if (window.isDatabaseReady) window.loadIssues();
+            console.log("Admin View:", window.isAdmin);
+        });
+
+        // --- Issue Card Rendering ---
+
+        function getStatusColor(status) {
+            switch (status) {
+                case 'Reported': return 'reported-border bg-amber-50';
+                case 'In Progress': return 'in-progress-border bg-red-50';
+                case 'Resolved': return 'resolved-border bg-emerald-50';
+                default: return 'bg-gray-50';
+            }
+        }
+
+        window.renderIssueCard = function(issue) {
+            const issuesList = document.getElementById('issues-list');
+            const colorClass = getStatusColor(issue.status);
+            // Handle possibility of missing or non-Timestamp timestamps
+            const timestampText = issue.timestamp && typeof issue.timestamp.toDate === 'function' ? 
+                                new Date(issue.timestamp.toDate()).toLocaleDateString() : 'N/A';
+            
+            let adminControls = '';
+
+            if (window.isAdmin && window.isDatabaseReady) {
+                const statuses = ['Reported', 'In Progress', 'Resolved'];
+                const options = statuses.map(s => 
+                    `<option value="${s}" ${issue.status === s ? 'selected' : ''}>${s}</option>`
+                ).join('');
+
+                adminControls = `
+                    <div class="mt-4 pt-3 border-t border-gray-200">
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Update Status:</label>
+                        <select onchange="window.updateStatus('${issue.id}', this.value)" class="block w-full text-sm rounded-lg border-gray-300 p-2 focus:border-blue-500 focus:ring-blue-500">
+                            ${options}
+                        </select>
+                    </div>
+                `;
+            }
+
+            const cardHtml = `
+                <div class="issue-card ${colorClass} rounded-xl shadow-lg p-5 transition duration-300 hover:shadow-xl hover:ring-2 hover:ring-blue-300">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-lg font-bold text-gray-900">${issue.category}</span>
+                        <span class="text-xs font-bold text-white px-3 py-1 rounded-full uppercase" style="background-color: ${getMarkerColor(issue.status)};">${issue.status}</span>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">${issue.description}</p>
+                    <div class="text-xs text-gray-500 space-y-1 pt-2 border-t border-dashed border-gray-200">
+                        <p><span class="font-semibold text-gray-600">Reported:</span> ${timestampText}</p>
+                        <p><span class="font-semibold text-gray-600">Reporter:</span> ${issue.reporterId.substring(0, 8)}...</p>
+                    </div>
+                    <!-- Now calling window.zoomToIssue, which is globally accessible -->
+                    <button onclick="window.zoomToIssue('${issue.id}'); event.stopPropagation();" class="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800 transition duration-150">View on Map &rarr;</button>
+                    ${adminControls}
+                </div>
+            `;
+            issuesList.insertAdjacentHTML('beforeend', cardHtml);
+        }
+
+        // --- Attach setup to window load (Final step) ---
+        window.addEventListener('load', () => {
+            initMap(); // Initialize map immediately for better UX
+            window.setupFirebase(); // Start database connection
+        });
+
+    </script>
+</body>
+</html>
