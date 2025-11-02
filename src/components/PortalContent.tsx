@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MapPin, AlertCircle, Settings } from "lucide-react";
+import { MapPin, AlertCircle } from "lucide-react";
 import L from "leaflet";
 import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
@@ -72,7 +72,13 @@ const PortalContent = () => {
 
   useEffect(() => {
     // Initialize Leaflet map
-    if (mapRef.current && !window.mapInstance) {
+    if (mapRef.current) {
+      // Clean up existing map instance if it exists
+      if (window.mapInstance) {
+        window.mapInstance.remove();
+        window.mapInstance = undefined;
+      }
+
       const defaultLat = 28.7041;
       const defaultLng = 77.1025;
 
@@ -160,6 +166,11 @@ const PortalContent = () => {
 
       return () => {
         window.removeEventListener("resize", handleResize);
+        // Clean up map on unmount
+        if (window.mapInstance) {
+          window.mapInstance.remove();
+          window.mapInstance = undefined;
+        }
       };
     }
   }, []);
@@ -406,14 +417,14 @@ const PortalContent = () => {
       {/* Admin Toggle Button - Bottom Right */}
       <button
         onClick={() => setIsAdmin(!isAdmin)}
-        className={`fixed bottom-8 right-8 p-4 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:scale-110 z-[100] ${
+        className={`fixed bottom-6 right-6 px-6 py-3 rounded-full font-bold text-sm shadow-xl hover:shadow-2xl transition-all transform hover:scale-105 z-[99999] ${
           isAdmin
-            ? "bg-red-600 dark:bg-red-700 text-white"
-            : "bg-blue-600 dark:bg-blue-700 text-white"
+            ? "bg-red-500 dark:bg-red-600 text-white hover:bg-red-600"
+            : "bg-indigo-600 dark:bg-indigo-700 text-white hover:bg-indigo-700"
         }`}
         title={isAdmin ? "Disable Admin Mode" : "Enable Admin Mode"}
       >
-        <Settings className="h-6 w-6" />
+        {isAdmin ? "❌ Admin OFF" : "👨‍💼 Admin Mode"}
       </button>
 
       {/* Admin Panel - Status Editor */}
