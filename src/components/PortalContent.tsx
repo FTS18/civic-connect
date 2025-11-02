@@ -283,6 +283,23 @@ const PortalContent = () => {
     setSelectedIssueForEdit(null);
   };
 
+  // Delete issue - only allow users to delete their own issues
+  const deleteIssue = (issueId: string, issueUserId: string) => {
+    // Don't allow deleting demo issues
+    if (issueId.startsWith("demo-")) {
+      console.warn("Cannot delete demo issues");
+      return;
+    }
+
+    // Check if user is the owner or is admin
+    if (user?.uid === issueUserId || isAdmin) {
+      setIssues((prevIssues) => prevIssues.filter((issue) => issue.id !== issueId));
+      console.log(`✅ Issue ${issueId} deleted`);
+    } else {
+      console.warn("You can only delete your own issues");
+    }
+  };
+
   // Zoom to issue location on map
   const zoomToIssueLocation = (issue: any) => {
     if (window.mapInstance && issue.location) {
@@ -376,7 +393,7 @@ const PortalContent = () => {
                       <span className="font-medium">{issue.category}</span>
                     </p>
                     <p className="text-gray-600 dark:text-gray-400 mb-3 text-sm">{issue.description}</p>
-                    <div className="flex justify-start items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
                       <span className={`font-semibold capitalize px-3 py-1 rounded text-xs ${
                         issue.status === "reported" ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200" :
                         issue.status === "inProgress" ? "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200" :
@@ -384,6 +401,22 @@ const PortalContent = () => {
                       }`}>
                         {issue.status}
                       </span>
+                      
+                      {/* Delete Button - Show for issue owner or admin */}
+                      {(isAuthenticated && (user?.uid === issue.userId || issue.userId === "anonymous" && user?.email === issue.userName) || isAdmin) && !issue.id.startsWith("demo-") && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Are you sure you want to delete "${issue.title}"?`)) {
+                              deleteIssue(issue.id, issue.userId);
+                            }
+                          }}
+                          className="ml-2 px-2 py-1 text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
+                          title="Delete this issue"
+                        >
+                          🗑️ Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
