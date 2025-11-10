@@ -29,7 +29,8 @@ import {
   deleteDoc,
   doc,
   updateDoc,
-  onSnapshot
+  onSnapshot,
+  setDoc
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -294,10 +295,7 @@ export const saveUserVoteToFirestore = async (
     if (voteType === null) {
       await deleteDoc(voteRef).catch(() => {});
     } else {
-      const voteData = { userId, issueId, voteType };
-      await updateDoc(voteRef, voteData).catch(async () => {
-        await addDoc(collection(db, "userVotes"), voteData);
-      });
+      await setDoc(voteRef, { userId, issueId, voteType, timestamp: Timestamp.now() });
     }
   } catch (error: any) {
     console.error("❌ Error saving user vote:", error);

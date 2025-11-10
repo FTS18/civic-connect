@@ -678,7 +678,7 @@ const PortalContent = () => {
   };
 
   // Handle upvote
-  const handleUpvote = (issueId: string) => {
+  const handleUpvote = async (issueId: string) => {
     if (!isAuthenticated) {
       toast.error('Please login to upvote');
       return;
@@ -690,12 +690,12 @@ const PortalContent = () => {
     setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
     
     if (user?.uid) {
-      saveUserVoteToFirestore(user.uid, issueId, newVote);
+      await saveUserVoteToFirestore(user.uid, issueId, newVote);
     }
   };
 
   // Handle downvote
-  const handleDownvote = (issueId: string) => {
+  const handleDownvote = async (issueId: string) => {
     if (!isAuthenticated) {
       toast.error('Please login to downvote');
       return;
@@ -707,7 +707,7 @@ const PortalContent = () => {
     setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
     
     if (user?.uid) {
-      saveUserVoteToFirestore(user.uid, issueId, newVote);
+      await saveUserVoteToFirestore(user.uid, issueId, newVote);
     }
   };
 
