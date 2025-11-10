@@ -5,10 +5,6 @@ import { isAdmin, adminLogout } from '@/lib/firebase';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { LogOut, Search, X, Map, Clock, TrendingUp, Users, AlertCircle, CheckCircle, Filter, ChevronDown } from 'lucide-react';
 import L from 'leaflet';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import 'leaflet.markercluster';
-import { PageSkeleton } from '@/components/LoadingStates';
 
 const AdminDashboardPage = () => {
   const [adminAuthenticated, setAdminAuthenticated] = useState(isAdmin());
