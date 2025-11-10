@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { MapPin, AlertCircle, Map, List, Navigation, ThumbsUp, ThumbsDown, Share2, Lightbulb, Search, Filter, BarChart3, LogOut } from "lucide-react";
 import L from "leaflet";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
-import "leaflet.markercluster";
 import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import AdminDashboard from "./AdminDashboard";
@@ -463,11 +460,8 @@ const PortalContent = () => {
       window.mapInstance.removeLayer(clusterGroupRef.current);
     }
 
-    // Create new cluster group
-    const clusterGroup = L.markerClusterGroup({
-      maxClusterRadius: 80,
-      disableClusteringAtZoom: 16,
-    }) as any;
+    // Create feature group for markers
+    const markerGroup = L.featureGroup() as any;
 
     const statusColorMap: any = {
       reported: "#F59E0B",
@@ -487,8 +481,6 @@ const PortalContent = () => {
           }),
         } as any);
 
-        marker.options.issueMarker = true;
-        
         // Create popup content with optional photos
         let popupContent = `<strong>${issue.title}</strong><br>${issue.description}<br><small>${issue.userName}</small>`;
         if (issue.photos && issue.photos.length > 0) {
@@ -500,13 +492,13 @@ const PortalContent = () => {
         
         marker.bindPopup(popupContent);
         marker.on('click', () => zoomToIssueLocation(issue));
-        clusterGroup.addLayer(marker);
+        markerGroup.addLayer(marker);
       }
     });
 
-    // Add cluster group to map
-    clusterGroup.addTo(window.mapInstance);
-    clusterGroupRef.current = clusterGroup;
+    // Add marker group to map
+    markerGroup.addTo(window.mapInstance);
+    clusterGroupRef.current = markerGroup;
   }, [filteredIssues]);
 
   // Listen for image open events from map popups
