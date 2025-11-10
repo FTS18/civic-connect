@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import AdminDashboard from "./AdminDashboard";
 import type { IssueCategory } from "@/types/issue";
-import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, getAllIssuesFromFirestore, isAdmin, adminLogout } from "@/lib/firebase";
+import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, saveUserVoteToFirestore, getUserVotesFromFirestore, getAllIssuesFromFirestore, isAdmin, adminLogout } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 
 declare global {
@@ -135,19 +135,12 @@ const PortalContent = () => {
     loadIssues();
   }, [isAuthenticated]);
 
-  // Load user votes from localStorage on mount and when user changes
+  // Load user votes from Firestore on mount and when user changes
   useEffect(() => {
     if (isAuthenticated && user?.uid) {
-      const userVotesKey = `civic-votes-${user.uid}`;
-      const savedVotes = localStorage.getItem(userVotesKey);
-      if (savedVotes) {
-        try {
-          const parsedVotes = JSON.parse(savedVotes);
-          setUserVotes(parsedVotes);
-        } catch (error) {
-          console.error("Error loading votes:", error);
-        }
-      }
+      getUserVotesFromFirestore(user.uid).then((votes) => {
+        setUserVotes(votes);
+      });
     }
 
     // Load offline queue from localStorage
@@ -690,13 +683,12 @@ const PortalContent = () => {
     // Update user votes first (for instant UI feedback)
     const currentVote = userVotes[issueId];
     const newVote = currentVote === "up" ? null : "up";
-    setUserVotes((prev) => {
-      const updated = { ...prev, [issueId]: newVote };
-      // Save to localStorage with user ID
-      const userVotesKey = `civic-votes-${user?.uid}`;
-      localStorage.setItem(userVotesKey, JSON.stringify(updated));
-      return updated;
-    });
+    setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
+    
+    // Save to Firestore
+    if (user?.uid) {
+      saveUserVoteToFirestore(user.uid, issueId, newVote);
+    }
 
     // Then update issues
     setIssues((prevIssues) =>
@@ -739,13 +731,12 @@ const PortalContent = () => {
     // Update user votes first (for instant UI feedback)
     const currentVote = userVotes[issueId];
     const newVote = currentVote === "down" ? null : "down";
-    setUserVotes((prev) => {
-      const updated = { ...prev, [issueId]: newVote };
-      // Save to localStorage with user ID
-      const userVotesKey = `civic-votes-${user?.uid}`;
-      localStorage.setItem(userVotesKey, JSON.stringify(updated));
-      return updated;
-    });
+    setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
+    
+    // Save to Firestore
+    if (user?.uid) {
+      saveUserVoteToFirestore(user.uid, issueId, newVote);
+    }
 
     // Then update issues
     setIssues((prevIssues) =>

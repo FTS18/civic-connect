@@ -284,6 +284,47 @@ export const updateIssueVotesInFirestore = async (
   }
 };
 
+// Save user vote to Firestore
+export const saveUserVoteToFirestore = async (
+  userId: string,
+  issueId: string,
+  voteType: "up" | "down" | null
+) => {
+  try {
+    const voteRef = doc(db, "userVotes", `${userId}_${issueId}`);
+    if (voteType === null) {
+      await deleteDoc(voteRef);
+    } else {
+      await updateDoc(voteRef, { voteType }).catch(() => 
+        addDoc(collection(db, "userVotes"), {
+          userId,
+          issueId,
+          voteType,
+        })
+      );
+    }
+  } catch (error: any) {
+    console.error("❌ Error saving user vote:", error);
+  }
+};
+
+// Get user votes from Firestore
+export const getUserVotesFromFirestore = async (userId: string) => {
+  try {
+    const q = query(collection(db, "userVotes"), where("userId", "==", userId));
+    const querySnapshot = await getDocs(q);
+    const votes: { [issueId: string]: "up" | "down" } = {};
+    querySnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      votes[data.issueId] = data.voteType;
+    });
+    return votes;
+  } catch (error: any) {
+    console.error("❌ Error loading user votes:", error);
+    return {};
+  }
+};
+
 // Admin Authentication
 export const adminLogin = (email: string, password: string): boolean => {
   // Hardcoded admin credentials (in production, use Firebase Admin SDK)
