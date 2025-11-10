@@ -60,7 +60,7 @@ const DEMO_ISSUES = [
 
 const PortalContent = () => {
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
-  const [adminAuthenticated, setAdminAuthenticated] = useState(isAdmin());
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedIssueForEdit, setSelectedIssueForEdit] = useState<any>(null);
   const [issues, setIssues] = useState<any[]>(() => {
@@ -84,6 +84,11 @@ const PortalContent = () => {
   const mapRef = useRef(null);
   const clusterGroupRef = useRef<any>(null);
   const isDarkMode = document.documentElement.classList.contains("dark");
+
+  // Check admin authentication on mount
+  useEffect(() => {
+    setAdminAuthenticated(isAdmin());
+  }, []);
 
   // Update issues when authentication state changes or auth finishes loading
   useEffect(() => {
