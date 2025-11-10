@@ -2,9 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLogin from '@/components/AdminLogin';
 import { isAdmin, adminLogout } from '@/lib/firebase';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { LogOut, Search, X, Map, Clock, TrendingUp, Users, AlertCircle, CheckCircle, Filter, ChevronDown } from 'lucide-react';
 import L from 'leaflet';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
 
 const AdminDashboardPage = () => {
   const [adminAuthenticated, setAdminAuthenticated] = useState(isAdmin());
@@ -174,6 +177,12 @@ const AdminDashboardPage = () => {
     markersRef.current.forEach(marker => mapInstanceRef.current.removeLayer(marker));
     markersRef.current = [];
 
+    // Create marker cluster group
+    const markerCluster = (L as any).markerClusterGroup({
+      maxClusterRadius: 80,
+      disableClusteringAtZoom: 16,
+    });
+
     // Add new markers
     filteredIssues.forEach(issue => {
       if (issue.latitude && issue.longitude) {
@@ -192,17 +201,20 @@ const AdminDashboardPage = () => {
           [issue.latitude, issue.longitude],
           { radius: 8, fillColor: color, color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8 }
         )
-          .bindPopup(popupContent)
-          .addTo(mapInstanceRef.current);
+          .bindPopup(popupContent);
         
         marker.on('click', () => {
           setSelectedIssue(issue);
           setShowIssueModal(true);
         });
 
+        markerCluster.addLayer(marker);
         markersRef.current.push(marker);
       }
     });
+
+    // Add cluster to map
+    mapInstanceRef.current.addLayer(markerCluster);
 
     // Fit bounds if there are markers
     if (markersRef.current.length > 0) {
@@ -276,6 +288,21 @@ const AdminDashboardPage = () => {
     ));
     setSelectedIssue(null);
     setShowIssueModal(false);
+  };
+
+  const handleDeleteIssue = async (issueId: string) => {
+    try {
+      const db = getFirestore();
+      const issueRef = doc(db, 'issues', issueId);
+      await deleteDoc(issueRef);
+      setIssues(issues.filter(issue => issue.id !== issueId));
+      setSelectedIssue(null);
+      setShowIssueModal(false);
+      console.log('✅ Issue deleted:', issueId);
+    } catch (error) {
+      console.error('❌ Error deleting issue:', error);
+      alert('Failed to delete issue');
+    }
   };
 
   // Get unique categories
@@ -393,6 +420,19 @@ const AdminDashboardPage = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete "${selectedIssue.title}"?`)) {
+                      handleDeleteIssue(selectedIssue.id);
+                    }
+                  }}
+                  className="w-full py-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded-lg font-semibold transition-all"
+                >
+                  🗑️ Delete Issue
+                </button>
               </div>
             </div>
           </div>

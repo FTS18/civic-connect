@@ -44,12 +44,10 @@ const Hero = () => {
               size="lg" 
               variant="hero"
               className="bg-card text-card-foreground hover:bg-card/90 text-lg px-8 py-6 h-auto"
-              asChild
+              onClick={() => window.location.href = '/portal'}
             >
-              <a href="/portal">
-                Open Portal
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </a>
+              Open Portal
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
         </div>
