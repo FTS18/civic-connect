@@ -675,17 +675,10 @@ const PortalContent = () => {
       return;
     }
 
-    // Update user votes first (for instant UI feedback)
     const currentVote = userVotes[issueId];
     const newVote = currentVote === "up" ? null : "up";
-    setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
     
-    // Save to Firestore
-    if (user?.uid) {
-      saveUserVoteToFirestore(user.uid, issueId, newVote);
-    }
-
-    // Then update issues
+    // Update issues first
     setIssues((prevIssues) =>
       prevIssues.map((issue) => {
         if (issue.id === issueId) {
@@ -693,18 +686,14 @@ const PortalContent = () => {
           let newDownvotes = issue.downvotes || 0;
 
           if (currentVote === "up") {
-            // Remove upvote
             newUpvotes = Math.max(0, newUpvotes - 1);
           } else if (currentVote === "down") {
-            // Switch from downvote to upvote
             newUpvotes += 1;
             newDownvotes = Math.max(0, newDownvotes - 1);
           } else {
-            // Add upvote
             newUpvotes += 1;
           }
 
-          // Update Firestore if not demo issue
           if (!issueId.startsWith("demo-")) {
             updateIssueVotesInFirestore(issueId, newUpvotes, newDownvotes);
           }
@@ -714,6 +703,13 @@ const PortalContent = () => {
         return issue;
       })
     );
+
+    // Update user votes
+    setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
+    
+    if (user?.uid) {
+      saveUserVoteToFirestore(user.uid, issueId, newVote);
+    }
   };
 
   // Handle downvote
@@ -723,17 +719,10 @@ const PortalContent = () => {
       return;
     }
 
-    // Update user votes first (for instant UI feedback)
     const currentVote = userVotes[issueId];
     const newVote = currentVote === "down" ? null : "down";
-    setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
     
-    // Save to Firestore
-    if (user?.uid) {
-      saveUserVoteToFirestore(user.uid, issueId, newVote);
-    }
-
-    // Then update issues
+    // Update issues first
     setIssues((prevIssues) =>
       prevIssues.map((issue) => {
         if (issue.id === issueId) {
@@ -741,18 +730,14 @@ const PortalContent = () => {
           let newDownvotes = issue.downvotes || 0;
 
           if (currentVote === "down") {
-            // Remove downvote
             newDownvotes = Math.max(0, newDownvotes - 1);
           } else if (currentVote === "up") {
-            // Switch from upvote to downvote
             newUpvotes = Math.max(0, newUpvotes - 1);
             newDownvotes += 1;
           } else {
-            // Add downvote
             newDownvotes += 1;
           }
 
-          // Update Firestore if not demo issue
           if (!issueId.startsWith("demo-")) {
             updateIssueVotesInFirestore(issueId, newUpvotes, newDownvotes);
           }
@@ -762,6 +747,13 @@ const PortalContent = () => {
         return issue;
       })
     );
+
+    // Update user votes
+    setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
+    
+    if (user?.uid) {
+      saveUserVoteToFirestore(user.uid, issueId, newVote);
+    }
   };
 
   // Handle share
