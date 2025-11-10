@@ -10,6 +10,9 @@ import AdminDashboard from "./AdminDashboard";
 import type { IssueCategory } from "@/types/issue";
 import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, saveUserVoteToFirestore, subscribeToUserVotes, subscribeToIssues, isAdmin, adminLogout } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
+import { checkRateLimit, getRemainingTime } from "@/lib/rateLimit";
+import { toast } from "sonner";
+import IssueCardSkeleton from "./IssueCardSkeleton";
 
 declare global {
   interface Window {
@@ -506,6 +509,12 @@ const PortalContent = () => {
     longitude: number;
     address?: string;
   }) => {
+    if (!checkRateLimit(user?.uid || 'anonymous', 'report_issue', 3, 60000)) {
+      const remainingTime = Math.ceil(getRemainingTime(user?.uid || 'anonymous', 'report_issue', 60000) / 1000);
+      toast.error(`Too many reports! Please wait ${remainingTime} seconds.`);
+      return;
+    }
+
     console.log('📝 [ZURI] Starting issue submission:', {
       title: issueData.title,
       category: issueData.category,
@@ -605,9 +614,11 @@ const PortalContent = () => {
       setShowReportModal(false);
       setSelectedLocation(null);
       
+      toast.success('Issue reported successfully!');
       console.log('✅ [ZURI] Issue submission completed successfully');
     } catch (error) {
       console.error("❌ [ZURI] Error submitting report:", error);
+      toast.error('Failed to submit report. Please try again.');
       throw error;
     }
   };
@@ -660,7 +671,7 @@ const PortalContent = () => {
   // Handle upvote
   const handleUpvote = (issueId: string) => {
     if (!isAuthenticated) {
-      alert("Please login to upvote");
+      toast.error('Please login to upvote');
       return;
     }
 
@@ -708,7 +719,7 @@ const PortalContent = () => {
   // Handle downvote
   const handleDownvote = (issueId: string) => {
     if (!isAuthenticated) {
-      alert("Please login to downvote");
+      toast.error('Please login to downvote');
       return;
     }
 
@@ -773,12 +784,12 @@ const PortalContent = () => {
   // Handle suggestion submit
   const handleAddSuggestion = (issueId: string) => {
     if (!isAuthenticated) {
-      alert("Please login to add suggestions");
+      toast.error('Please login to add suggestions');
       return;
     }
 
     if (!suggestionText.trim()) {
-      alert("Please enter a suggestion");
+      toast.error('Please enter a suggestion');
       return;
     }
 
@@ -1101,9 +1112,13 @@ const PortalContent = () => {
           {statusFilter === "all" ? "All Reports" : `${statusFilter} Reports`}
         </h2>
 
-        {!loading && (
-          <>
-            {filteredIssues.length === 0 ? (
+        {loading ? (
+          <div id="issues-list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <IssueCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredIssues.length === 0 ? (
               <p className="text-gray-500 dark:text-gray-400 mb-4">
                 No {statusFilter === "all" ? "issues" : statusFilter + " issues"} reported yet.
               </p>

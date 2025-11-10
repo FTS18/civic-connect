@@ -14,6 +14,45 @@ export interface CloudinaryResponse {
   size: number;
 }
 
+// Compress image before upload
+const compressImage = async (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const maxSize = 1920;
+        if (width > height && width > maxSize) {
+          height = (height * maxSize) / width;
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = (width * maxSize) / height;
+          height = maxSize;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.8);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 /**
  * Upload an image to Cloudinary using preset
  * @param file - The image file to upload
@@ -27,6 +66,11 @@ export async function uploadImageToCloudinary(
   if (!CLOUD_NAME) {
     throw new Error('Cloudinary cloud name not configured in .env');
   }
+
+  // Compress image first
+  const compressedFile = await compressImage(file);
+  console.log(`📦 [ZURI] Compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+  file = compressedFile;
 
   console.log('🔍 [ZURI] Starting Cloudinary upload:', {
     fileName: file.name,
