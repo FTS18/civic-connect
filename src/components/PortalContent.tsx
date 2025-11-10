@@ -1275,7 +1275,7 @@ const PortalContent = () => {
                   </div>
                 ))}
               </div>
-            )
+            )}
 
           {/* Map Click Instructions */}
           {isAuthenticated && (
