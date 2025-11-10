@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { MapPin, AlertCircle } from "lucide-react";
+import { MapPin, AlertCircle, Map, List, Navigation } from "lucide-react";
 import L from "leaflet";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import MarkerClusterGroup from "leaflet.markercluster";
 import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import type { IssueCategory } from "@/types/issue";
@@ -64,7 +67,9 @@ const PortalContent = () => {
   const [loading, setLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const mapRef = useRef(null);
+  const clusterGroupRef = useRef<any>(null);
   const isDarkMode = document.documentElement.classList.contains("dark");
 
   // Update issues when authentication state changes or auth finishes loading
@@ -235,26 +240,62 @@ const PortalContent = () => {
     ? allIssues 
     : allIssues.filter(issue => issue.status === statusFilter);
 
-  // Add markers to map for all issues
+  // Zoom to issue location on map
+  const zoomToIssueLocation = (issue: any) => {
+    if (window.mapInstance && issue.location) {
+      window.mapInstance.setView([issue.location.lat, issue.location.lng], 16, {
+        animate: true,
+        duration: 1,
+      });
+    }
+  };
+
+  const handleLocateMe = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          if (window.mapInstance) {
+            window.mapInstance.setView([latitude, longitude], 14, {
+              animate: true,
+              duration: 1,
+            });
+          }
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          alert("Unable to access your location. Please check permissions.");
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by your browser.");
+    }
+  };
+
+  // Add clustered markers to map for all issues
   useEffect(() => {
     if (!window.mapInstance) return;
 
-    // Clear existing issue markers
-    window.mapInstance.eachLayer((layer: any) => {
-      if (layer.options?.issueMarker) {
-        window.mapInstance?.removeLayer(layer);
-      }
-    });
+    // Remove existing cluster group if present
+    if (clusterGroupRef.current) {
+      window.mapInstance.removeLayer(clusterGroupRef.current);
+    }
 
-    // Add markers for filtered issues
+    // Create new cluster group
+    const clusterGroup = L.markerClusterGroup({
+      maxClusterRadius: 80,
+      disableClusteringAtZoom: 16,
+    }) as any;
+
+    const statusColorMap: any = {
+      reported: "#F59E0B",
+      inProgress: "#EF4444",
+      resolved: "#10B981",
+    };
+
+    // Add markers for filtered issues to cluster group
     filteredIssues.forEach((issue) => {
       if (issue.location) {
-        const statusColorMap: any = {
-          reported: "#F59E0B",
-          inProgress: "#EF4444",
-          resolved: "#10B981",
-        };
-
         const marker = L.marker([issue.location.lat, issue.location.lng], {
           icon: L.divIcon({
             className: "custom-div-icon",
@@ -266,9 +307,14 @@ const PortalContent = () => {
 
         marker.options.issueMarker = true;
         marker.bindPopup(`<strong>${issue.title}</strong><br>${issue.description}<br><small>${issue.userName}</small>`);
-        marker.addTo(window.mapInstance);
+        marker.on('click', () => zoomToIssueLocation(issue));
+        clusterGroup.addLayer(marker);
       }
     });
+
+    // Add cluster group to map
+    clusterGroup.addTo(window.mapInstance);
+    clusterGroupRef.current = clusterGroup;
   }, [filteredIssues]);
 
   const handleReportSubmit = async (issueData: {
@@ -349,17 +395,6 @@ const PortalContent = () => {
       console.warn("You can only delete your own issues");
     }
   };
-
-  // Zoom to issue location on map
-  const zoomToIssueLocation = (issue: any) => {
-    if (window.mapInstance && issue.location) {
-      window.mapInstance.setView([issue.location.lat, issue.location.lng], 16, {
-        animate: true,
-        duration: 1,
-      });
-    }
-  };
-
   const statusColors = {
     reported: "#F59E0B",
     inProgress: "#EF4444",
@@ -396,14 +431,52 @@ const PortalContent = () => {
 
         {/* Map Section with filtered issues */}
         <div className="mb-10 bg-white dark:bg-slate-900 rounded-xl shadow-2xl overflow-hidden ring-2 ring-indigo-200/50 dark:ring-indigo-900/50">
-          <div className="relative w-full" style={{ height: "500px", maxHeight: "70vh" }}>
-            <div
-              ref={mapRef}
-              id="map"
-              className="w-full h-full"
-              style={{ position: "relative" }}
-            ></div>
+          {/* View Toggle Controls */}
+          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+            <button
+              onClick={() => setViewMode("map")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm transition-all ${
+                viewMode === "map"
+                  ? "bg-blue-500 text-white shadow-md"
+                  : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+              }`}
+            >
+              <Map size={16} /> Map
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm transition-all ${
+                viewMode === "list"
+                  ? "bg-blue-500 text-white shadow-md"
+                  : "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600"
+              }`}
+            >
+              <List size={16} /> List
+            </button>
+            
+            {/* Locate Me Button */}
+            {viewMode === "map" && (
+              <button
+                onClick={handleLocateMe}
+                className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm bg-indigo-500 hover:bg-indigo-600 text-white shadow-md transition-all"
+                title="Center map on your current location"
+              >
+                <Navigation size={16} /> Locate Me
+              </button>
+            )}
           </div>
+
+          {/* Map Display */}
+          {viewMode === "map" ? (
+            <div className="relative w-full" style={{ height: "500px", maxHeight: "70vh" }}>
+              <div
+                ref={mapRef}
+                id="map"
+                className="w-full h-full"
+                style={{ position: "relative" }}
+              ></div>
+            </div>
+          ) : null}
         </div>
 
         {/* Issues List Section */}
