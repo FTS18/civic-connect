@@ -95,7 +95,7 @@ service cloud.firestore {
 ## 👥 Developers
 
 - **Ananay Dubey** - [ananay.netlify.app](https://ananay.netlify.app)
-- **Shikhar Yadav** - [LinkedIn](https://linkedin.com)
+- **Shikhar Yadav** - [LinkedIn](https://linkedin.com/in/shikhar-yadav-16733330a)
 
 ## 📄 License
 
