@@ -14,7 +14,17 @@ export interface Issue {
   createdAt: Date;
   updatedAt: Date;
   upvotes: number;
+  downvotes?: number;
+  suggestions?: Suggestion[];
   comments: Comment[];
+}
+
+export interface Suggestion {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: Date;
 }
 
 export interface Comment {

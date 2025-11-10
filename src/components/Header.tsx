@@ -1,4 +1,4 @@
-import { MapPin, Menu, X, Moon, Sun, LogOut, User as UserIcon } from "lucide-react";
+import { MapPin, Menu, X, Moon, Sun, LogOut, User as UserIcon, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -128,13 +128,21 @@ const Header = () => {
                 )}
               </div>
             ) : (
-              <Button 
-                variant="hero" 
-                size="sm"
-                onClick={() => setShowAuthModal(true)}
-              >
-                Login
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="hero" 
+                  size="sm"
+                  onClick={() => setShowAuthModal(true)}
+                >
+                  Login
+                </Button>
+                <Link 
+                  to="/admin"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                >
+                  <ShieldAlert size={16} /> Admin
+                </Link>
+              </div>
             )}
           </nav>
 
@@ -188,17 +196,26 @@ const Header = () => {
                 </Link>
               )
             ))}
-            <Button 
-              variant="hero" 
-              size="sm" 
-              className="w-full mt-2"
-              onClick={() => {
-                setShowAuthModal(true);
-                setMobileMenuOpen(false);
-              }}
-            >
-              Login
-            </Button>
+            <div className="flex flex-col gap-2 mt-2">
+              <Button 
+                variant="hero" 
+                size="sm" 
+                className="w-full"
+                onClick={() => {
+                  setShowAuthModal(true);
+                  setMobileMenuOpen(false);
+                }}
+              >
+                Login
+              </Button>
+              <Link 
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                <ShieldAlert size={16} /> Admin Portal
+              </Link>
+            </div>
             
             {isAuthenticated && user && (
               <div className="border-t border-border mt-4 pt-4">

@@ -210,14 +210,25 @@ const ReportModal = ({ isOpen, onClose, latitude = 28.7041, longitude = 77.1025,
           {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Image
+              📸 Add Photo (Optional)
             </label>
             <input
               type="file"
-              onChange={(e) => setImage(e.target.files ? e.target.files[0] : null)}
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files ? e.target.files[0] : null;
+                setImage(file);
+              }}
               disabled={isLoading}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-white p-2 disabled:opacity-50"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-slate-800 dark:text-white p-2 disabled:opacity-50 cursor-pointer"
             />
+            {image && (
+              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-300">✅ Photo selected:</p>
+                <p className="text-sm text-blue-700 dark:text-blue-400">{image.name}</p>
+                <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">Size: {(image.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+            )}
           </div>
 
           {/* Address */}
