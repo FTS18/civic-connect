@@ -20,7 +20,7 @@ interface ReportModalProps {
 }
 
 const ReportModal = ({ isOpen, onClose, latitude = 28.7041, longitude = 77.1025, onSubmit }: ReportModalProps) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, setShowAuthModal } = useAuth();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<IssueCategory>("other");
   const [description, setDescription] = useState("");
@@ -64,7 +64,7 @@ const ReportModal = ({ isOpen, onClose, latitude = 28.7041, longitude = 77.1025,
             <button
               onClick={() => {
                 onClose();
-                // TODO: Open login modal
+                setShowAuthModal(true);
               }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
             >

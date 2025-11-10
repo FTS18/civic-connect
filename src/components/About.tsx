@@ -39,14 +39,15 @@ const About = () => {
             About CivicConnect
           </h2>
           <p className="text-lg text-muted-foreground mb-4">
-            CivicConnect bridges the gap between citizens and local government through 
-            innovative technology. Our platform enables real-time reporting and tracking 
-            of civic issues, fostering transparency and accountability.
+            CivicConnect is a modern civic engagement platform that empowers citizens to report and track 
+            infrastructure issues in real-time. Using interactive maps, photo uploads, and community voting, 
+            we create a transparent bridge between residents and local authorities.
           </p>
           <p className="text-lg text-muted-foreground">
-            From broken streetlights to potholes, graffiti to park maintenance - every 
-            report matters. Join thousands of engaged citizens making their communities 
-            better, one report at a time.
+            From potholes to broken streetlights, traffic issues to park maintenance - every report is geotagged, 
+            photographed, and tracked through resolution. Our admin dashboard provides authorities with powerful 
+            analytics and filtering tools to prioritize and resolve issues efficiently. Join the movement to build 
+            smarter, more responsive communities.
           </p>
         </div>
       </div>

@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { MaskContainer } from "@/components/ui/svg-mask-effect";
 
 const Hero = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16 animate-on-scroll">
       {/* Video Background */}
       <video
         className="absolute inset-0 w-full h-full object-cover z-0"
@@ -17,29 +18,31 @@ const Hero = () => {
       </video>
       
       {/* Dark Overlay for Contrast */}
-      <div className="absolute inset-0 z-[1]" style={{ backgroundColor: 'var(--hero-bg-overlay)' }} />
-      
-      {/* Gradient Overlay for Additional Depth */}
-      <div 
-        className="absolute inset-0 z-[2]"
-        style={{
-          background: 'var(--hero-gradient-dark-overlay)',
-        }}
-      />
+      <div className="absolute inset-0 z-[1] bg-black/60" />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="max-w-3xl mx-auto text-center animate-fade-in">
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-primary-foreground mb-6 leading-tight">
-            CivicConnect
-          </h1>
-          <p className="text-xl sm:text-2xl text-primary-foreground/90 mb-4 font-medium">
+        <div className="max-w-3xl mx-auto text-center">
+          <MaskContainer
+            revealText={
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-blue-400 leading-tight">
+                CivicConnect
+              </h1>
+            }
+            className="mb-6 min-h-[120px] flex items-center justify-center"
+            revealSize={300}
+          >
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-primary-foreground leading-tight animate-scale" style={{ animationDelay: '200ms' }}>
+              CivicConnect
+            </h1>
+          </MaskContainer>
+          <p className="text-xl sm:text-2xl text-primary-foreground/90 mb-4 font-medium animate-on-scroll" style={{ animationDelay: '400ms' }}>
             Empowering citizens through technology
           </p>
-          <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg text-primary-foreground/80 mb-8 max-w-2xl mx-auto animate-on-scroll" style={{ animationDelay: '600ms' }}>
             A platform that allows citizens to report civic issues on an interactive map in real time. 
             Connect with your community and local authorities to create positive change.
           </p>
-          <div className="space-x-4">
+          <div className="space-x-4 animate-on-scroll" style={{ animationDelay: '800ms' }}>
             <Button  
               size="lg" 
               variant="hero"

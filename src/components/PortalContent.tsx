@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { MapPin, AlertCircle, Map, List, Navigation, ThumbsUp, ThumbsDown, Share2, Lightbulb, Search, Filter, BarChart3, LogOut } from "lucide-react";
 import L from "leaflet";
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
 import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import AdminDashboard from "./AdminDashboard";
@@ -460,8 +463,11 @@ const PortalContent = () => {
       window.mapInstance.removeLayer(clusterGroupRef.current);
     }
 
-    // Create feature group for markers
-    const markerGroup = L.featureGroup() as any;
+    // Create marker cluster group
+    const markerCluster = (L as any).markerClusterGroup({
+      maxClusterRadius: 80,
+      disableClusteringAtZoom: 16,
+    });
 
     const statusColorMap: any = {
       reported: "#F59E0B",
@@ -492,13 +498,13 @@ const PortalContent = () => {
         
         marker.bindPopup(popupContent);
         marker.on('click', () => zoomToIssueLocation(issue));
-        markerGroup.addLayer(marker);
+        markerCluster.addLayer(marker);
       }
     });
 
-    // Add marker group to map
-    markerGroup.addTo(window.mapInstance);
-    clusterGroupRef.current = markerGroup;
+    // Add cluster to map
+    markerCluster.addTo(window.mapInstance);
+    clusterGroupRef.current = markerCluster;
   }, [filteredIssues]);
 
   // Listen for image open events from map popups
@@ -1116,7 +1122,7 @@ const PortalContent = () => {
                 {filteredIssues.map((issue) => (
                   <div
                     key={issue.id}
-                    className="issue-card bg-white dark:bg-slate-800 p-5 rounded-lg border-l-4 shadow-lg hover:shadow-xl transition-all cursor-pointer relative"
+                    className="issue-card bg-white dark:bg-slate-800 p-5 rounded-lg border-l-4 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 cursor-pointer relative group overflow-hidden"
                     style={{
                       borderLeftColor: statusColors[issue.status] || statusColors.reported,
                     }}
@@ -1124,7 +1130,21 @@ const PortalContent = () => {
                       zoomToIssueLocation(issue);
                       if (adminAuthenticated) setSelectedIssueForEdit(issue);
                     }}
+                    onMouseMove={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = e.clientX - rect.left;
+                      const y = e.clientY - rect.top;
+                      e.currentTarget.style.setProperty('--mouse-x', `${x}px`);
+                      e.currentTarget.style.setProperty('--mouse-y', `${y}px`);
+                    }}
                   >
+                    {/* Direction-aware spotlight effect */}
+                    <div 
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                      style={{
+                        background: 'radial-gradient(400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(59, 130, 246, 0.08), transparent 40%)'
+                      }}
+                    />
                     {/* Share Button - Top Right */}
                     <button
                       onClick={(e) => {
