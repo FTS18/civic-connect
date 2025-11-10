@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import AdminDashboard from "./AdminDashboard";
 import type { IssueCategory } from "@/types/issue";
-import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, saveUserVoteToFirestore, getUserVotesFromFirestore, getAllIssuesFromFirestore, isAdmin, adminLogout } from "@/lib/firebase";
+import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, saveUserVoteToFirestore, subscribeToUserVotes, subscribeToIssues, isAdmin, adminLogout } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 
 declare global {
@@ -90,57 +90,39 @@ const PortalContent = () => {
     setAdminAuthenticated(isAdmin());
   }, []);
 
-  // Update issues when authentication state changes or auth finishes loading
+  // Real-time subscription to issues
   useEffect(() => {
-    const loadIssues = async () => {
-      // Always show demo issues
-      let allIssues = [...DEMO_ISSUES];
+    setLoading(true);
+    const unsubscribe = subscribeToIssues((firestoreIssues) => {
+      const formattedFirestoreIssues = firestoreIssues.map((issue: any) => ({
+        id: issue.id,
+        userId: issue.userId || "unknown",
+        userName: issue.userName || "Anonymous",
+        title: issue.title,
+        category: issue.category,
+        description: issue.description,
+        status: issue.status || "reported",
+        createdAt: issue.createdAt?.toDate ? issue.createdAt.toDate() : new Date(issue.createdAt),
+        upvotes: issue.upvotes || 0,
+        downvotes: issue.downvotes || 0,
+        location: { lat: issue.latitude, lng: issue.longitude },
+        photos: issue.photos || undefined,
+      }));
       
-      // Load all Firestore issues for everyone (not just authenticated users)
-      try {
-        setLoading(true);
-        const firestoreIssues = await getAllIssuesFromFirestore();
-        
-        console.log('🔍 [ZURI] Raw Firestore issues:', firestoreIssues);
-        
-        // Convert Firestore data format to our format
-        const formattedFirestoreIssues = firestoreIssues.map((issue: any) => ({
-          id: issue.id,
-          userId: issue.userId || "unknown",
-          userName: issue.userName || "Anonymous",
-          title: issue.title,
-          category: issue.category,
-          description: issue.description,
-          status: issue.status || "reported",
-          createdAt: issue.createdAt?.toDate ? issue.createdAt.toDate() : new Date(issue.createdAt),
-          upvotes: issue.upvotes || 0,
-          downvotes: issue.downvotes || 0,
-          location: { lat: issue.latitude, lng: issue.longitude },
-          photos: issue.photos || undefined,
-        }));
-        
-        console.log('✅ [ZURI] Formatted issues with photos:', formattedFirestoreIssues.map((i: any) => ({ id: i.id, title: i.title, photos: i.photos })));
-        
-        // Combine demo issues with all Firestore issues
-        allIssues = [...DEMO_ISSUES, ...formattedFirestoreIssues];
-      } catch (error) {
-        console.error("❌ Error loading issues:", error);
-        // Fallback to demo issues if Firestore fails
-      } finally {
-        setIssues(allIssues);
-        setLoading(false);
-      }
-    };
+      setIssues([...DEMO_ISSUES, ...formattedFirestoreIssues]);
+      setLoading(false);
+    });
     
-    loadIssues();
-  }, [isAuthenticated]);
+    return () => unsubscribe();
+  }, []);
 
-  // Load user votes from Firestore on mount and when user changes
+  // Real-time subscription to user votes
   useEffect(() => {
     if (isAuthenticated && user?.uid) {
-      getUserVotesFromFirestore(user.uid).then((votes) => {
+      const unsubscribe = subscribeToUserVotes(user.uid, (votes) => {
         setUserVotes(votes);
       });
+      return () => unsubscribe();
     } else {
       setUserVotes({});
     }

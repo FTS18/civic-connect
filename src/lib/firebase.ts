@@ -28,7 +28,8 @@ import {
   Timestamp,
   deleteDoc,
   doc,
-  updateDoc
+  updateDoc,
+  onSnapshot
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -195,11 +196,6 @@ export const addIssueToFirestore = async (issueData: {
       upvotes: 0,
       downvotes: 0,
     });
-    
-    // Clear cache when new issue added
-    localStorage.removeItem("civicconnect_issues_cache");
-    localStorage.removeItem("civicconnect_issues_cache_time");
-    
     console.log("✅ [ZURI] Issue saved to Firestore:", docRef.id, issueData.photos ? `with ${issueData.photos.length} photo(s)` : 'no photos');
     return docRef.id;
   } catch (error: any) {
@@ -208,40 +204,19 @@ export const addIssueToFirestore = async (issueData: {
   }
 };
 
-// Get all issues from Firestore with caching
-export const getAllIssuesFromFirestore = async () => {
-  try {
-    // Check cache first (5 minutes)
-    const cacheKey = "civicconnect_issues_cache";
-    const cacheTimeKey = "civicconnect_issues_cache_time";
-    const cached = localStorage.getItem(cacheKey);
-    const cacheTime = localStorage.getItem(cacheTimeKey);
-    
-    if (cached && cacheTime) {
-      const age = Date.now() - parseInt(cacheTime);
-      if (age < 5 * 60 * 1000) {
-        console.log("✅ Loaded issues from cache:", JSON.parse(cached).length);
-        return JSON.parse(cached);
-      }
-    }
-
-    const q = query(collection(db, "issues"), orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    const issues = querySnapshot.docs.map((doc) => ({
+// Real-time listener for all issues
+export const subscribeToIssues = (callback: (issues: any[]) => void) => {
+  const q = query(collection(db, "issues"), orderBy("createdAt", "desc"));
+  return onSnapshot(q, (snapshot) => {
+    const issues = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
-    
-    // Cache results
-    localStorage.setItem(cacheKey, JSON.stringify(issues));
-    localStorage.setItem(cacheTimeKey, Date.now().toString());
-    
-    console.log("✅ Loaded issues from Firestore:", issues.length);
-    return issues;
-  } catch (error: any) {
-    console.error("❌ Error loading issues from Firestore:", error);
-    return [];
-  }
+    console.log("✅ Real-time issues update:", issues.length);
+    callback(issues);
+  }, (error) => {
+    console.error("❌ Error subscribing to issues:", error);
+  });
 };
 
 // Get user's issues from Firestore
@@ -303,10 +278,6 @@ export const updateIssueVotesInFirestore = async (
       upvotes,
       downvotes,
     });
-    
-    // Clear cache when votes updated
-    localStorage.removeItem("civicconnect_issues_cache");
-    localStorage.removeItem("civicconnect_issues_cache_time");
   } catch (error: any) {
     console.error("❌ Error updating votes in Firestore:", error);
   }
@@ -328,48 +299,24 @@ export const saveUserVoteToFirestore = async (
         await addDoc(collection(db, "userVotes"), voteData);
       });
     }
-    
-    // Clear vote cache when updated
-    localStorage.removeItem(`civicconnect_votes_cache_${userId}`);
-    localStorage.removeItem(`civicconnect_votes_cache_time_${userId}`);
   } catch (error: any) {
     console.error("❌ Error saving user vote:", error);
   }
 };
 
-// Get user votes from Firestore with caching
-export const getUserVotesFromFirestore = async (userId: string) => {
-  try {
-    // Check cache first (2 minutes)
-    const cacheKey = `civicconnect_votes_cache_${userId}`;
-    const cacheTimeKey = `civicconnect_votes_cache_time_${userId}`;
-    const cached = localStorage.getItem(cacheKey);
-    const cacheTime = localStorage.getItem(cacheTimeKey);
-    
-    if (cached && cacheTime) {
-      const age = Date.now() - parseInt(cacheTime);
-      if (age < 2 * 60 * 1000) {
-        return JSON.parse(cached);
-      }
-    }
-
-    const q = query(collection(db, "userVotes"), where("userId", "==", userId));
-    const querySnapshot = await getDocs(q);
+// Real-time listener for user votes
+export const subscribeToUserVotes = (userId: string, callback: (votes: { [issueId: string]: "up" | "down" }) => void) => {
+  const q = query(collection(db, "userVotes"), where("userId", "==", userId));
+  return onSnapshot(q, (snapshot) => {
     const votes: { [issueId: string]: "up" | "down" } = {};
-    querySnapshot.docs.forEach((doc) => {
+    snapshot.docs.forEach((doc) => {
       const data = doc.data();
       votes[data.issueId] = data.voteType;
     });
-    
-    // Cache results
-    localStorage.setItem(cacheKey, JSON.stringify(votes));
-    localStorage.setItem(cacheTimeKey, Date.now().toString());
-    
-    return votes;
-  } catch (error: any) {
-    console.error("❌ Error loading user votes:", error);
-    return {};
-  }
+    callback(votes);
+  }, (error) => {
+    console.error("❌ Error subscribing to votes:", error);
+  });
 };
 
 // Admin Authentication
