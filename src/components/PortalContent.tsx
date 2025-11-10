@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import AdminDashboard from "./AdminDashboard";
 import type { IssueCategory } from "@/types/issue";
-import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, getAllIssuesFromFirestore, isAdmin, adminLogout } from "@/lib/firebase";
+import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, getAllIssuesFromFirestore, isAdmin, adminLogout } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 
 declare global {
@@ -717,6 +717,11 @@ const PortalContent = () => {
             newUpvotes += 1;
           }
 
+          // Update Firestore if not demo issue
+          if (!issueId.startsWith("demo-")) {
+            updateIssueVotesInFirestore(issueId, newUpvotes, newDownvotes);
+          }
+
           return { ...issue, upvotes: newUpvotes, downvotes: newDownvotes };
         }
         return issue;
@@ -759,6 +764,11 @@ const PortalContent = () => {
           } else {
             // Add downvote
             newDownvotes += 1;
+          }
+
+          // Update Firestore if not demo issue
+          if (!issueId.startsWith("demo-")) {
+            updateIssueVotesInFirestore(issueId, newUpvotes, newDownvotes);
           }
 
           return { ...issue, upvotes: newUpvotes, downvotes: newDownvotes };

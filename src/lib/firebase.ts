@@ -268,6 +268,22 @@ export const updateIssueStatusInFirestore = async (
   }
 };
 
+// Update issue votes in Firestore
+export const updateIssueVotesInFirestore = async (
+  issueId: string,
+  upvotes: number,
+  downvotes: number
+) => {
+  try {
+    await updateDoc(doc(db, "issues", issueId), {
+      upvotes,
+      downvotes,
+    });
+  } catch (error: any) {
+    console.error("❌ Error updating votes in Firestore:", error);
+  }
+};
+
 // Admin Authentication
 export const adminLogin = (email: string, password: string): boolean => {
   // Hardcoded admin credentials (in production, use Firebase Admin SDK)
