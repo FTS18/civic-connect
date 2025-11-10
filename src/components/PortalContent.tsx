@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ReportModal from "./ReportModal";
 import AdminDashboard from "./AdminDashboard";
 import type { IssueCategory } from "@/types/issue";
-import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, updateIssueVotesInFirestore, saveUserVoteToFirestore, subscribeToUserVotes, subscribeToIssues, isAdmin, adminLogout } from "@/lib/firebase";
+import { addIssueToFirestore, deleteIssueFromFirestore, updateIssueStatusInFirestore, saveUserVoteToFirestore, subscribeToUserVotes, subscribeToAllVotes, subscribeToIssues, isAdmin, adminLogout } from "@/lib/firebase";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { checkRateLimit, getRemainingTime } from "@/lib/rateLimit";
 import { toast } from "sonner";
@@ -75,6 +75,7 @@ const PortalContent = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const [userVotes, setUserVotes] = useState<{ [issueId: string]: "up" | "down" | null }>({});
+  const [voteCounts, setVoteCounts] = useState<{ [issueId: string]: { upvotes: number; downvotes: number } }>({});
   const [showSuggestionModal, setShowSuggestionModal] = useState<string | null>(null);
   const [suggestionText, setSuggestionText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,8 +107,8 @@ const PortalContent = () => {
         description: issue.description,
         status: issue.status || "reported",
         createdAt: issue.createdAt?.toDate ? issue.createdAt.toDate() : new Date(issue.createdAt),
-        upvotes: issue.upvotes || 0,
-        downvotes: issue.downvotes || 0,
+        upvotes: 0,
+        downvotes: 0,
         location: { lat: issue.latitude, lng: issue.longitude },
         photos: issue.photos || undefined,
       }));
@@ -116,6 +117,14 @@ const PortalContent = () => {
       setLoading(false);
     });
     
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time subscription to all votes
+  useEffect(() => {
+    const unsubscribe = subscribeToAllVotes((counts) => {
+      setVoteCounts(counts);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -678,33 +687,6 @@ const PortalContent = () => {
     const currentVote = userVotes[issueId];
     const newVote = currentVote === "up" ? null : "up";
     
-    // Update issues first
-    setIssues((prevIssues) =>
-      prevIssues.map((issue) => {
-        if (issue.id === issueId) {
-          let newUpvotes = issue.upvotes;
-          let newDownvotes = issue.downvotes || 0;
-
-          if (currentVote === "up") {
-            newUpvotes = Math.max(0, newUpvotes - 1);
-          } else if (currentVote === "down") {
-            newUpvotes += 1;
-            newDownvotes = Math.max(0, newDownvotes - 1);
-          } else {
-            newUpvotes += 1;
-          }
-
-          if (!issueId.startsWith("demo-")) {
-            updateIssueVotesInFirestore(issueId, newUpvotes, newDownvotes);
-          }
-
-          return { ...issue, upvotes: newUpvotes, downvotes: newDownvotes };
-        }
-        return issue;
-      })
-    );
-
-    // Update user votes
     setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
     
     if (user?.uid) {
@@ -722,33 +704,6 @@ const PortalContent = () => {
     const currentVote = userVotes[issueId];
     const newVote = currentVote === "down" ? null : "down";
     
-    // Update issues first
-    setIssues((prevIssues) =>
-      prevIssues.map((issue) => {
-        if (issue.id === issueId) {
-          let newUpvotes = issue.upvotes;
-          let newDownvotes = issue.downvotes || 0;
-
-          if (currentVote === "down") {
-            newDownvotes = Math.max(0, newDownvotes - 1);
-          } else if (currentVote === "up") {
-            newUpvotes = Math.max(0, newUpvotes - 1);
-            newDownvotes += 1;
-          } else {
-            newDownvotes += 1;
-          }
-
-          if (!issueId.startsWith("demo-")) {
-            updateIssueVotesInFirestore(issueId, newUpvotes, newDownvotes);
-          }
-
-          return { ...issue, upvotes: newUpvotes, downvotes: newDownvotes };
-        }
-        return issue;
-      })
-    );
-
-    // Update user votes
     setUserVotes((prev) => ({ ...prev, [issueId]: newVote }));
     
     if (user?.uid) {
@@ -1204,7 +1159,7 @@ const PortalContent = () => {
                         }`}
                         title="Upvote this issue"
                       >
-                        <ThumbsUp size={14} /> {issue.upvotes}
+                        <ThumbsUp size={14} /> {voteCounts[issue.id]?.upvotes || 0}
                       </button>
 
                       {/* Downvote Button */}
@@ -1220,7 +1175,7 @@ const PortalContent = () => {
                         }`}
                         title="Downvote this issue"
                       >
-                        <ThumbsDown size={14} /> {issue.downvotes || 0}
+                        <ThumbsDown size={14} /> {voteCounts[issue.id]?.downvotes || 0}
                       </button>
 
                       {/* Suggest Button */}

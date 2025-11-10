@@ -319,6 +319,28 @@ export const subscribeToUserVotes = (userId: string, callback: (votes: { [issueI
   });
 };
 
+// Real-time listener for all votes (to calculate counts)
+export const subscribeToAllVotes = (callback: (voteCounts: { [issueId: string]: { upvotes: number; downvotes: number } }) => void) => {
+  return onSnapshot(collection(db, "userVotes"), (snapshot) => {
+    const voteCounts: { [issueId: string]: { upvotes: number; downvotes: number } } = {};
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      const issueId = data.issueId;
+      if (!voteCounts[issueId]) {
+        voteCounts[issueId] = { upvotes: 0, downvotes: 0 };
+      }
+      if (data.voteType === "up") {
+        voteCounts[issueId].upvotes++;
+      } else if (data.voteType === "down") {
+        voteCounts[issueId].downvotes++;
+      }
+    });
+    callback(voteCounts);
+  }, (error) => {
+    console.error("❌ Error subscribing to all votes:", error);
+  });
+};
+
 // Admin Authentication
 export const adminLogin = (email: string, password: string): boolean => {
   // Hardcoded admin credentials (in production, use Firebase Admin SDK)
