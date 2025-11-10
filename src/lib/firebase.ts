@@ -293,15 +293,12 @@ export const saveUserVoteToFirestore = async (
   try {
     const voteRef = doc(db, "userVotes", `${userId}_${issueId}`);
     if (voteType === null) {
-      await deleteDoc(voteRef);
+      await deleteDoc(voteRef).catch(() => {});
     } else {
-      await updateDoc(voteRef, { voteType }).catch(() => 
-        addDoc(collection(db, "userVotes"), {
-          userId,
-          issueId,
-          voteType,
-        })
-      );
+      const voteData = { userId, issueId, voteType };
+      await updateDoc(voteRef, voteData).catch(async () => {
+        await addDoc(collection(db, "userVotes"), voteData);
+      });
     }
   } catch (error: any) {
     console.error("❌ Error saving user vote:", error);

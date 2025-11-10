@@ -141,6 +141,8 @@ const PortalContent = () => {
       getUserVotesFromFirestore(user.uid).then((votes) => {
         setUserVotes(votes);
       });
+    } else {
+      setUserVotes({});
     }
 
     // Load offline queue from localStorage
