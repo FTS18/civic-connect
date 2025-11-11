@@ -137,6 +137,7 @@ const PortalContent = () => {
       return () => unsubscribe();
     } else {
       setUserVotes({});
+      return undefined;
     }
 
     // Load offline queue from localStorage
@@ -156,13 +157,11 @@ const PortalContent = () => {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      console.log("🌐 Back online");
       syncOfflineQueue();
     };
 
     const handleOffline = () => {
       setIsOnline(false);
-      console.log("📴 Offline mode");
     };
 
     window.addEventListener("online", handleOnline);
@@ -180,43 +179,27 @@ const PortalContent = () => {
 
     console.log(`🔄 Syncing ${offlineQueue.length} offline item(s)`);
     const itemsToSync = [...offlineQueue];
-    let syncedCount = 0;
     
     for (const item of itemsToSync) {
       try {
         if (item.type === "issue") {
           await addIssueToFirestore(item.data);
           setOfflineQueue((prev) => prev.filter((i) => i.id !== item.id));
-          syncedCount++;
           
-          // Update localStorage after each successful sync
           const queueKey = "civic-offline-queue";
           const updatedQueue = JSON.parse(localStorage.getItem(queueKey) || "[]").filter((i: any) => i.id !== item.id);
           localStorage.setItem(queueKey, JSON.stringify(updatedQueue));
         }
       } catch (error) {
-        console.error("Sync failed for item:", item.id);
+        // Silent fail
       }
-    }
-    
-    if (syncedCount > 0) {
-      console.log(`✅ Synced ${syncedCount} item(s)`);
     }
   };
 
   useEffect(() => {
     // Request geolocation permission early
     if ("geolocation" in navigator) {
-      navigator.permissions?.query?.({ name: 'geolocation' }).then((result) => {
-        if (result.state === 'granted') {
-          console.log("📍 Geolocation permission granted");
-        } else if (result.state === 'prompt') {
-          console.log("📍 Geolocation permission pending - will request when map loads");
-        }
-      }).catch(() => {
-        // Permissions API not available, continue anyway
-        console.log("📍 Permissions API not available");
-      });
+      navigator.permissions?.query?.({ name: 'geolocation' }).then(() => {}).catch(() => {});
     }
 
     // Initialize Leaflet map
@@ -361,19 +344,12 @@ const PortalContent = () => {
       return;
     }
     
-    // Filter out demo issues before saving
     const userIssues = issues.filter((issue: any) => !issue.id.startsWith("demo-"));
-    console.log("🔍 All issues in state:", issues.length, issues.map((i: any) => ({ id: i.id, title: i.title })));
-    console.log("🔍 Filtered user issues:", userIssues.length, userIssues.map((i: any) => ({ id: i.id, title: i.title })));
     
     if (userIssues.length === 0) {
-      // Clear localStorage if no user issues
       localStorage.removeItem("civicconnect_issues");
-      console.log("🧹 Cleared localStorage (no user issues)");
     } else {
-      // Save user issues
       localStorage.setItem("civicconnect_issues", JSON.stringify(userIssues));
-      console.log(`💾 Saved ${userIssues.length} user issues to localStorage`);
     }
   }, [issues, isAuthenticated]);
 
@@ -524,30 +500,17 @@ const PortalContent = () => {
       return;
     }
 
-    console.log('📝 [ZURI] Starting issue submission:', {
-      title: issueData.title,
-      category: issueData.category,
-      hasImage: !!issueData.image,
-      imageSize: issueData.image ? `${(issueData.image.size / 1024 / 1024).toFixed(2)} MB` : 'N/A'
-    });
+
 
     try {
       // Upload photo to Cloudinary if provided
       const photoUrls: string[] = [];
       if (issueData.image) {
         try {
-          console.log("📸 [ZURI] Starting photo upload to Cloudinary...");
           const cloudinaryResponse = await uploadImageToCloudinary(issueData.image, "civic-connect-issues");
           photoUrls.push(cloudinaryResponse.secure_url);
-          console.log("✅ [ZURI] Photo uploaded successfully to:", cloudinaryResponse.secure_url);
-          
-          // Additional verification - try to load the image
-          const img = new Image();
-          img.onload = () => console.log('✅ [ZURI] Image loads correctly in browser');
-          img.onerror = () => console.error('❌ [ZURI] Image failed to load in browser');
-          img.src = cloudinaryResponse.secure_url;
         } catch (uploadError) {
-          console.error("❌ [ZURI] Photo upload failed, continuing without photo:", uploadError);
+          toast.error('Photo upload failed');
         }
       }
       
@@ -574,8 +537,6 @@ const PortalContent = () => {
       // Add to issues list
       setIssues((prevIssues) => [newIssue, ...prevIssues]);
 
-      console.log('💾 [ZURI] Saving issue to Firestore...');
-      
       // Save to Firestore
       try {
         const firestoreData = {
@@ -590,18 +551,9 @@ const PortalContent = () => {
           ...(photoUrls.length > 0 && { photos: photoUrls }),
         };
         
-        console.log('📝 [ZURI] Firestore data to save:', {
-          ...firestoreData,
-          photos: photoUrls.length > 0 ? `${photoUrls.length} photo(s)` : 'No photos'
-        });
-        
         if (isOnline) {
-          // Save directly to Firestore when online
-          const firestoreId = await addIssueToFirestore(firestoreData);
-          console.log("✅ [ZURI] Issue saved to Firestore with ID:", firestoreId);
+          await addIssueToFirestore(firestoreData);
         } else {
-          // Queue for later sync when offline
-          console.log("📴 [ZURI] Offline - issue queued for sync");
           const queueItem = {
             id: `queue-${Date.now()}`,
             type: "issue",
@@ -610,25 +562,20 @@ const PortalContent = () => {
           };
           setOfflineQueue((prev) => [...prev, queueItem]);
           
-          // Also save to localStorage
           const queueKey = "civic-offline-queue";
           const existingQueue = JSON.parse(localStorage.getItem(queueKey) || "[]");
           localStorage.setItem(queueKey, JSON.stringify([...existingQueue, queueItem]));
         }
       } catch (firestoreError) {
-        console.error("❌ [ZURI] Firestore save error:", firestoreError);
+        toast.error('Failed to save issue');
       }
 
       // Close modal
       setShowReportModal(false);
       setSelectedLocation(null);
-      
       toast.success('Issue reported successfully!');
-      console.log('✅ [ZURI] Issue submission completed successfully');
     } catch (error) {
-      console.error("❌ [ZURI] Error submitting report:", error);
       toast.error('Failed to submit report. Please try again.');
-      throw error;
     }
   };
 
@@ -644,10 +591,8 @@ const PortalContent = () => {
     // Update in Firestore
     try {
       await updateIssueStatusInFirestore(issueId, newStatus);
-      console.log(`💾 Issue ${issueId} status updated in Firestore to ${newStatus}`);
     } catch (error) {
-      console.error("⚠️ Warning: Could not update status in Firestore:", error);
-      // Status is already updated locally, so continue
+      toast.error('Failed to update status');
     }
   };
 
@@ -655,25 +600,20 @@ const PortalContent = () => {
   const deleteIssue = async (issueId: string, issueUserId: string) => {
     // Don't allow deleting demo issues
     if (issueId.startsWith("demo-")) {
-      console.warn("Cannot delete demo issues");
       return;
     }
 
     // Check if user is the owner or is admin
     if (user?.uid === issueUserId || adminAuthenticated) {
       setIssues((prevIssues) => prevIssues.filter((issue) => issue.id !== issueId));
-      console.log(`✅ Issue ${issueId} deleted locally`);
 
-      // Delete from Firestore
       try {
         await deleteIssueFromFirestore(issueId);
-        console.log(`💾 Issue ${issueId} deleted from Firestore`);
       } catch (error) {
-        console.error("⚠️ Warning: Could not delete from Firestore:", error);
-        // Issue is already deleted locally, so continue
+        toast.error('Failed to delete issue');
       }
     } else {
-      console.warn("You can only delete your own issues");
+      toast.error('You can only delete your own issues');
     }
   };
 
